@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Used MacBook Checker</title>
+<style>
+  :root { --ok:#2ecc71; --bg:#f5f5f7; --card:#fff; --accent:#0071e3; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); margin:0; color:#1d1d1f; }
+  header { position:sticky; top:0; background:var(--card); padding:12px 20px; box-shadow:0 1px 4px rgba(0,0,0,.1); z-index:10; }
+  .headrow { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  header h1 { margin:0; font-size:20px; flex:1; }
+  #langsel { font-size:14px; padding:5px 8px; border-radius:8px; border:1px solid #ccc; background:#fff; }
+  #termbtn { font-size:13px; background:var(--accent); color:#fff; border:none; cursor:pointer; padding:6px 12px; border-radius:8px; white-space:nowrap; }
+  #termbtn:hover { opacity:.85; }
+  .cmdrow { display:flex; gap:8px; align-items:flex-start; margin:4px 0 12px; }
+  pre.cmd { flex:1; background:#1d1d1f; color:#e8e8ed; padding:10px 12px; border-radius:8px; font-size:12.5px; margin:0; overflow-x:auto; white-space:pre-wrap; word-break:break-all; }
+  #progressbar { height:8px; background:#e0e0e0; border-radius:4px; overflow:hidden; }
+  #progressfill { height:100%; width:0; background:var(--ok); transition:width .3s; }
+  #progresstext { font-size:13px; color:#666; margin-top:4px; }
+  main { max-width:860px; margin:0 auto; padding:20px; }
+  section { background:var(--card); border-radius:12px; padding:16px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  section h2 { margin:0 0 10px; font-size:17px; }
+  ul { list-style:none; margin:0; padding:0; }
+  li { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+  li:last-child { border-bottom:none; }
+  li input[type=checkbox] { width:20px; height:20px; margin-top:2px; flex-shrink:0; accent-color:var(--ok); }
+  li.done label { color:#999; text-decoration:line-through; }
+  li label { flex:1; cursor:pointer; line-height:1.45; }
+  .hint { display:block; font-size:12.5px; color:#888; text-decoration:none !important; margin-top:2px; }
+  li.done .hint { color:#bbb; }
+  code { background:#eee; padding:1px 5px; border-radius:4px; font-size:13px; }
+  button.test { flex-shrink:0; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; }
+  button.test:hover { opacity:.85; }
+  #resetBtn { background:#d70015; color:#fff; border:none; border-radius:8px; padding:8px 16px; cursor:pointer; margin-top:8px; }
+  /* serial */
+  .snrow { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  #sninput { flex:1; min-width:200px; padding:9px 12px; border:1px solid #ccc; border-radius:8px; font-size:15px; text-transform:uppercase; }
+  .snrow button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:14px; }
+  /* modal */
+  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; align-items:center; justify-content:center; }
+  #modal.open { display:flex; }
+  #modalbox { background:#fff; border-radius:14px; padding:20px; max-width:820px; width:94%; max-height:92vh; overflow:auto; }
+  #modalbox h3 { margin:0 0 12px; }
+  #modalclose { float:right; background:#e8e8ed; border:none; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  /* pixel test */
+  #pixeltest { display:none; position:fixed; inset:0; z-index:200; cursor:pointer; }
+  #pixelhint { position:absolute; top:12px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.6); color:#fff; padding:8px 16px; border-radius:8px; font-size:14px; pointer-events:none; }
+  /* keyboard */
+  #kb { user-select:none; }
+  .kbrow { display:flex; gap:4px; margin-bottom:4px; }
+  .key { background:#e8e8ed; border-radius:5px; padding:8px 0; text-align:center; font-size:11px; flex:1; min-width:0; overflow:hidden; white-space:nowrap; }
+  .key.wide { flex:1.6; } .key.xwide { flex:2.2; } .key.space { flex:6; }
+  .key.pressed { background:#ffd60a; }
+  .key.tested { background:var(--ok); color:#fff; }
+  /* media */
+  video { width:100%; max-height:360px; background:#000; border-radius:8px; transform:scaleX(-1); }
+  #miclevel { height:24px; background:#e0e0e0; border-radius:6px; overflow:hidden; margin-top:10px; }
+  #micfill { height:100%; width:0; background:var(--ok); transition:width .05s; }
+  /* trackpad */
+  #padcanvas { width:100%; height:260px; background:#f0f0f2; border-radius:8px; touch-action:none; cursor:crosshair; }
+  .padstats span { display:inline-block; background:#e8e8ed; border-radius:6px; padding:4px 10px; margin:4px 6px 0 0; font-size:13px; }
+  .padstats span.ok { background:var(--ok); color:#fff; }
+  .btnrow { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .btnrow button { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; }
+  .btnrow button.secondary { background:#e8e8ed; color:#1d1d1f; }
+  #batteryinfo { font-size:15px; line-height:1.6; }
+  /* auto-check */
+  #pastearea { width:100%; min-height:80px; font-family:ui-monospace,Menlo,monospace; font-size:12.5px; border:1px solid #ccc; border-radius:8px; padding:10px; resize:vertical; }
+  .autonote { font-size:12px; border-radius:6px; padding:1px 7px; white-space:nowrap; }
+  .autonote.pass { background:#e2f7e9; color:#1a7f37; }
+  .autonote.warn { background:#fff3cd; color:#8a6d00; }
+  .autonote.fail { background:#ffe0e0; color:#c00; }
+  .autonote.note { background:#e8e8ed; color:#555; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="headrow">
+    <h1 id="apptitle">🍎</h1>
+    <button id="termbtn">⌨️</button>
+    <select id="langsel">
+      <option value="en">English</option>
+      <option value="ru">Русский</option>
+      <option value="es">Español</option>
+      <option value="de">Deutsch</option>
+    </select>
+  </div>
+  <div id="progressbar"><div id="progressfill"></div></div>
+  <div id="progresstext"></div>
+</header>
+
+<main id="main"></main>
+
+<div id="modal"><div id="modalbox">
+  <button id="modalclose"></button>
+  <div id="modalcontent"></div>
+</div></div>
+
+<div id="pixeltest"><div id="pixelhint"></div></div>
+
+<script>
+'use strict';
+// [item id] or [item id, test name]
+const SECTIONS = [
+  ['exterior', ['screws','flat','lid','coating','hinge10','liquid']],
+  ['serial',   ['snmatch','specs','parts','truetone']],
+  ['diag',     ['diag']],
+  ['ports',    [['chargeports','battery'],'typec','hdmi','magsafe']],
+  ['screen',   [['pixels','pixels'],'angles','alsensor']],
+  ['media',    [['camera','camera'],['mic','mic'],['speakers','speakers'],['headphones','speakers'],'maxvol']],
+  ['wifi',     ['wifi','bt']],
+  ['battery',  ['batthealth','cycles']],
+  ['disk',     ['storage','smart','diskspeed']],
+  ['kb',       [['keys','keyboard'],'backlight','touchbar']],
+  ['security', ['findmy','activation','icloudout','musicout','mdmprofiles','mdmprocess','mdmcli','erase']],
+  ['passwords',['firmware','recovery','admin']],
+  ['trackpad', ['touchid',['pad','trackpad']]],
+  ['fans',     ['fans']],
+  ['system',   ['sleepwake']],
+];
+
+const I18N = {
+en: {
+ sections: { exterior:'Exterior', serial:'Serial number & specs', diag:'Apple Diagnostics', ports:'Ports & charging', screen:'Screen', media:'Multimedia', wifi:'Wi-Fi & Bluetooth', battery:'Battery', disk:'Storage', kb:'Keyboard', security:'Security & locks ⚠️', passwords:'Passwords', trackpad:'Trackpad', fans:'Fans', system:'System' },
+ items: {
+  screws:['Inspect the screws','Scratched screw heads mean the laptop has been opened'],
+  flat:['Sits flat on the table, does not wobble','A bent body suggests a drop or a swollen battery'],
+  lid:['Lid opens with one hand, no play',''],
+  coating:['Anti-reflective coating without stains','Look at the powered-off screen at an angle (staingate)'],
+  hinge10:['Open/close the lid ~10 times','Hinges must not creak or stick'],
+  liquid:['No signs of liquid damage','Smell, sticky keys, corrosion inside ports (use a flashlight), stains under keys'],
+  snmatch:['Serial number matches system, bottom case and box',' → About This Mac; also engraved on the bottom case and printed on the box'],
+  specs:['Specs match the listing','Chip (M1/M2/M3, Pro/Max), RAM and model year in About This Mac must match the ad'],
+  parts:['No “Unknown Part” warnings','System Settings → General → About — repairs with non-genuine parts show a warning on recent macOS'],
+  truetone:['True Tone option is present','Missing True Tone in Display settings often means the screen was replaced'],
+  diag:['Run Apple Diagnostics','Shut down → hold power ~12 s until options appear → hold <code>Cmd + D</code>. Expect “No issues found”'],
+  chargeports:['Charging works on every port','Move the charging cable between ports and watch the status in the test'],
+  typec:['All Type-C ports transfer data','Plug a USB drive into each port'],
+  hdmi:['HDMI outputs video (if the port exists)',''],
+  magsafe:['MagSafe and SD slot work (2021+ models)','MagSafe charges and holds magnetically; SD card is recognized'],
+  pixels:['Dead pixels','Full-screen color fill — click changes color, Esc exits'],
+  angles:['Check the screen at different angles','Use the gray and white screens from the pixel test — spots, backlight bleed, burn-in'],
+  alsensor:['Ambient light sensor','Enable auto-brightness, cover the camera area with your hand — brightness should drop'],
+  camera:['Camera works',''],
+  mic:['Microphone works',''],
+  speakers:['Speakers: left and right',''],
+  headphones:['Headphone jack','Plug in headphones and repeat the speaker test'],
+  maxvol:['Max volume without crackling','Run the sweep at full volume — no rattling or distortion'],
+  wifi:['Wi-Fi connects and stays connected',''],
+  bt:['Bluetooth sees devices',''],
+  batthealth:['Battery health','System Settings → Battery → Battery Health: “Normal”, maximum capacity ≥ 80%'],
+  cycles:['Battery cycle count',' → About This Mac → System Report → Power → Cycle Count. 500–700+ on older models = replacement soon. Terminal: <code>system_profiler SPPowerDataType</code>'],
+  storage:['Storage size as advertised',' → About This Mac → Storage, or Terminal: <code>diskutil info disk0 | grep "Disk Size"</code>'],
+  smart:['SMART status: Verified','Terminal: <code>diskutil info disk0 | grep SMART</code>'],
+  diskspeed:['SSD speed is adequate','Blackmagic Disk Speed Test — heavily degraded write speed = worn-out SSD'],
+  keys:['Every key registers','Press each key — it turns green'],
+  backlight:['Keyboard backlight','Set display brightness to zero, enable backlight, tilt the screen'],
+  touchbar:['Touch Bar works (2016–2019 models)','Responds across the whole strip, no dead zones'],
+  findmy:['Turn off Find My Mac, then sign out of iCloud','System Settings → Apple ID → iCloud → Find My Mac → off (seller enters their password)'],
+  activation:['Activation Lock: Disabled',' → About This Mac → More Info → System Report → Activation Lock Status'],
+  icloudout:['Signed out of iCloud','System Settings → Apple ID → Sign Out'],
+  musicout:['Signed out of Apple Music','Music → Account → Sign Out'],
+  mdmprofiles:['No “Profiles” item in System Settings','Its presence = corporate MDM enrollment'],
+  mdmprocess:['No mdmclient process right after reboot','Reboot → Activity Monitor → search “mdmclient”'],
+  mdmcli:['Check enrollment in Terminal','<code>profiles status -type enrollment</code> → expect “Enrolled via DEP: No” and “MDM enrollment: No”'],
+  erase:['Erase before handover','System Settings → General → Transfer or Reset → Erase All Content and Settings. Afterwards the Mac must not ask for the previous owner’s Apple ID — the final Activation Lock check'],
+  firmware:['No firmware password','Boot holding <code>Option</code> (Intel) — it must not ask for a password'],
+  recovery:['Recovery Mode boots','Apple Silicon: shut down, hold power → Options. Also verifies there is no firmware lock'],
+  admin:['Admin password known or removed','Terminal: <code>sudo -v</code> — if it asks for a password, the seller must know it'],
+  touchid:['Touch ID recognizes a fingerprint','System Settings → Touch ID — enroll your own finger'],
+  pad:['Cursor, clicks and gestures across the whole surface',''],
+  fans:['Fans at max speed without grinding','Install Macs Fan Control → max the RPM → listen'],
+  sleepwake:['Sleep/wake works','Close the lid, wait a minute, open — instant wake, no black screen or reboot. A common defect after liquid damage'],
+ },
+ ui: {
+  title:'🍎 Used MacBook Checker', term:'⌨️ Terminal checks', termTitle:'Terminal checks (no downloads needed)', termHint:'Open Terminal (Cmd+Space → “Terminal”) and paste the commands one by one. Commands with sudo ask for the admin password.', copy:'Copy', copied:'✓ Copied', pasteTitle:'Auto-check results', pasteHint:'Run the first command from “⌨️ Terminal checks” on the Mac being tested — the result is copied to the clipboard automatically. Paste it here: matching items get checked, warnings and failures are highlighted.', apply:'Apply', applied:'{n} items updated', cmdfull:'Full auto-check: prints PASS/WARN/FAIL and copies the result — paste it into the field at the top of the page', cmdmodel:'Model, chip, RAM and serial number', cmdlock:'Activation Lock — expect “Disabled”', cmdbattery:'Battery: cycle count and capacity (max/design ≥ 80%)', cmddisk:'Disk size and SMART status — expect “Verified”', cmdmdm:'MDM/DEP enrollment — expect “No” twice', cmdmdmproc:'mdmclient process — run right after a reboot', cmdmanaged:'Managed preferences — another MDM sign', cmdsudocheck:'Admin password — the seller must know it', cmdfirmware:'Firmware password (Intel only) — expect “No”', cmdfans:'Fan speed (rpm)', cmdstress:'CPU stress ~40 s — fans spin up, listen for grinding; stops by itself', progress:'{d} of {t} checks done', reset:'Reset progress', resetConfirm:'Reset all progress?', close:'✕ Close', test:'Test',
+  snPh:'Serial number ( → About This Mac)', coverage:'Check coverage on apple.com', snEmpty:'Enter a serial number first',
+  wifiOn:'Now: online ✅ — open a few sites, check stability', wifiOff:'Now: offline ❌',
+  pixelColors:['White','Black','Red','Green','Blue','Gray (viewing angles)'], pixelHint:'{name} ({i}/{n}) — click: next color, Esc: exit',
+  kbTitle:'Keyboard test', kbHint:'Press every key. Yellow = pressed, green = tested. Fn is detected via Fn+↓ (PageDown). Touch ID is not visible to the browser. Avoid Cmd+Q/W 🙂', kbTested:'Tested: {n} / {t}',
+  camTitle:'Camera test', camHint:'Check sharpness, colors, no artifacts. The green LED next to the camera must be on.', camErr:'No camera access: ',
+  micTitle:'Microphone test', micHint:'Speak — the bar should react to your voice:', micErr:'No microphone access: ',
+  spkTitle:'Speaker test', spkHint:'Sound must be clean, no crackling or rattling. For headphones — plug them in and repeat.', spkLeft:'◀ Left', spkRight:'Right ▶', spkBoth:'Both (stereo)', spkSweep:'Sweep 200–10000 Hz',
+  batTitle:'Port charging test', batHint:'Move the charging cable to each port in turn — the status must switch to “⚡ charging”. Works in Chrome; in Safari watch the macOS battery icon.', batNoApi:'Battery API is unavailable in this browser — open in Chrome or watch the battery icon in the macOS menu bar.', batLoading:'Loading…', batCharging:'⚡ charging', batOnBattery:'🔋 on battery', batStatus:'Status', batLevel:'Charge level',
+  padTitle:'Trackpad test', padHint:'Move your finger across the whole surface (the trail is drawn), click in different spots, try a two-finger click (right click) and two-finger scroll.', padMove:'movement', padLeft:'left click', padRight:'two-finger click', padScroll:'two-finger scroll', padClear:'Clear field',
+ }
+},
+ru: {
+ sections: { exterior:'Внешний вид', serial:'Серийный номер и характеристики', diag:'Диагностика Apple', ports:'Порты и зарядка', screen:'Экран', media:'Мультимедиа', wifi:'Wi-Fi и Bluetooth', battery:'Батарея', disk:'Диск', kb:'Клавиатура', security:'Защита и блокировки ⚠️', passwords:'Пароли', trackpad:'Трекпад', fans:'Вентиляторы', system:'Система' },
+ items: {
+  screws:['Осмотреть винты','Царапины на шлицах = ноутбук вскрывали'],
+  flat:['Ровно лежит на столе, не шатается','Изгиб корпуса — признак падения или вздутой батареи'],
+  lid:['Открытие крышки одной рукой, без люфта',''],
+  coating:['Антибликовое покрытие без пятен','Смотреть на выключенном экране под углом (staingate)'],
+  hinge10:['Открыть/закрыть крышку ~10 раз','Петли не должны скрипеть или заедать'],
+  liquid:['Нет следов жидкости','Запах, липкие клавиши, окисление в портах (посветить фонариком), разводы под клавишами'],
+  snmatch:['Серийный номер совпадает: система, нижняя крышка, коробка',' → About This Mac; также гравировка на нижней крышке и наклейка на коробке'],
+  specs:['Характеристики соответствуют объявлению','Чип (M1/M2/M3, Pro/Max), объём RAM и год модели в About This Mac должны совпадать с объявлением'],
+  parts:['Нет предупреждений «Unknown Part»','System Settings → General → About — ремонт неоригинальными деталями показывает предупреждение (на новых macOS)'],
+  truetone:['Опция True Tone на месте','Пропавшая True Tone в настройках дисплея часто означает заменённый экран'],
+  diag:['Запустить Apple Diagnostics','Выключить → зажать кнопку питания ~12 сек до появления опций → зажать <code>Cmd + D</code>. Результат: «No issues found»'],
+  chargeports:['Зарядка работает на всех портах','Переставляйте кабель по портам и следите за статусом в тесте'],
+  typec:['Все Type-C порты передают данные','Подключить флешку/диск в каждый порт'],
+  hdmi:['HDMI выводит изображение (если есть порт)',''],
+  magsafe:['MagSafe и SD-слот работают (модели 2021+)','MagSafe заряжает и держится магнитом; SD-карта распознаётся'],
+  pixels:['Битые пиксели','Полноэкранная заливка цветами — клик меняет цвет, Esc для выхода'],
+  angles:['Посмотреть на экран под разными углами','Используйте серый и белый экраны из теста пикселей — пятна, засветы, выгорание'],
+  alsensor:['Датчик освещённости','Включить автояркость, прикрыть зону камеры рукой — яркость должна упасть'],
+  camera:['Камера работает',''],
+  mic:['Микрофон работает',''],
+  speakers:['Динамики: левый и правый',''],
+  headphones:['Разъём наушников','Подключить наушники и повторить тест динамиков'],
+  maxvol:['Максимальная громкость без хрипов','Запустите свип на полной громкости — без дребезга и искажений'],
+  wifi:['Wi-Fi подключается и держит сеть',''],
+  bt:['Bluetooth видит устройства',''],
+  batthealth:['Здоровье батареи','System Settings → Battery → Battery Health: «Normal», ёмкость ≥ 80%'],
+  cycles:['Циклы заряда батареи',' → About This Mac → System Report → Power → Cycle Count. 500–700+ на старых моделях = скорая замена. Терминал: <code>system_profiler SPPowerDataType</code>'],
+  storage:['Размер накопителя соответствует заявленному',' → About This Mac → Storage, или в Терминале: <code>diskutil info disk0 | grep "Disk Size"</code>'],
+  smart:['SMART статус: Verified','Терминал: <code>diskutil info disk0 | grep SMART</code>'],
+  diskspeed:['Скорость SSD в норме','Blackmagic Disk Speed Test — сильно просевшая запись = изношенный SSD'],
+  keys:['Все клавиши срабатывают','Нажмите каждую клавишу — она станет зелёной'],
+  backlight:['Подсветка клавиатуры','Убрать яркость дисплея в ноль, включить подсветку, наклонить экран'],
+  touchbar:['Touch Bar работает (модели 2016–2019)','Реагирует по всей полосе, без мёртвых зон'],
+  findmy:['Отключить Find My Mac, затем выйти из iCloud','System Settings → Apple ID → iCloud → Find My Mac → выкл (продавец вводит пароль)'],
+  activation:['Activation Lock: Disabled',' → About This Mac → More Info → System Report → Activation Lock Status'],
+  icloudout:['Выход из iCloud выполнен','System Settings → Apple ID → Sign Out'],
+  musicout:['Выйти из Apple Music','Music → Account → Sign Out'],
+  mdmprofiles:['Нет пункта Profiles в System Settings','Наличие = корпоративная MDM-блокировка'],
+  mdmprocess:['Нет процесса mdmclient сразу после перезагрузки','Перезагрузить → Activity Monitor → поиск «mdmclient»'],
+  mdmcli:['Проверить enrollment в Терминале','<code>profiles status -type enrollment</code> → должно быть «Enrolled via DEP: No» и «MDM enrollment: No»'],
+  erase:['Стереть Mac перед передачей','System Settings → General → Transfer or Reset → Erase All Content and Settings. После стирания Mac не должен просить чужой Apple ID — финальная проверка Activation Lock'],
+  firmware:['Нет пароля прошивки','Загрузиться с зажатым <code>Option</code> (Intel) — не должен спрашивать пароль'],
+  recovery:['Recovery Mode загружается','Apple Silicon: выключить, зажать кнопку питания → Options. Заодно проверка отсутствия firmware-блокировки'],
+  admin:['Пароль администратора известен или снят','Терминал: <code>sudo -v</code> — если просит пароль, продавец должен его знать'],
+  touchid:['Touch ID распознаёт отпечаток','System Settings → Touch ID — добавить свой палец'],
+  pad:['Курсор, клики и жесты по всей площади',''],
+  fans:['Вентиляторы на максимуме без скрежета','Установить Macs Fan Control → выкрутить обороты → послушать'],
+  sleepwake:['Сон/пробуждение работают','Закрыть крышку, подождать минуту, открыть — мгновенное пробуждение, без чёрного экрана и перезагрузки. Частый дефект после залития'],
+ },
+ ui: {
+  title:'🍎 Проверка б/у MacBook', term:'⌨️ Проверки в Терминале', termTitle:'Проверки в Терминале (без скачиваний)', termHint:'Откройте Терминал (Cmd+Space → «Terminal») и вставляйте команды по одной. Команды с sudo попросят пароль администратора.', copy:'Копировать', copied:'✓ Скопировано', pasteTitle:'Результаты автопроверки', pasteHint:'Выполните первую команду из «⌨️ Проверки в Терминале» на проверяемом Mac — результат сам скопируется в буфер. Вставьте его сюда: пункты отметятся, предупреждения и провалы подсветятся.', apply:'Применить', applied:'{n} пунктов обновлено', cmdfull:'Полная автопроверка: печатает PASS/WARN/FAIL и копирует результат — вставьте его в поле вверху страницы', cmdmodel:'Модель, чип, RAM и серийный номер', cmdlock:'Activation Lock — должно быть «Disabled»', cmdbattery:'Батарея: циклы и ёмкость (max/design ≥ 80%)', cmddisk:'Размер диска и SMART — должно быть «Verified»', cmdmdm:'MDM/DEP регистрация — оба ответа «No»', cmdmdmproc:'Процесс mdmclient — запускать сразу после перезагрузки', cmdmanaged:'Управляемые настройки — ещё один признак MDM', cmdsudocheck:'Пароль администратора — продавец должен его знать', cmdfirmware:'Firmware-пароль (только Intel) — должно быть «No»', cmdfans:'Обороты вентиляторов (rpm)', cmdstress:'Стресс CPU ~40 сек — вентиляторы раскрутятся, слушайте скрежет; остановится сам', progress:'{d} из {t} проверок выполнено', reset:'Сбросить прогресс', resetConfirm:'Сбросить весь прогресс?', close:'✕ Закрыть', test:'Тест',
+  snPh:'Серийный номер ( → About This Mac)', coverage:'Проверить покрытие на apple.com', snEmpty:'Сначала введите серийный номер',
+  wifiOn:'Сейчас: онлайн ✅ — откройте пару сайтов, проверьте стабильность', wifiOff:'Сейчас: офлайн ❌',
+  pixelColors:['Белый','Чёрный','Красный','Зелёный','Синий','Серый (углы обзора)'], pixelHint:'{name} ({i}/{n}) — клик: следующий цвет, Esc: выход',
+  kbTitle:'Тест клавиатуры', kbHint:'Нажимайте клавиши. Жёлтая — нажата, зелёная — проверена. Fn проверяется комбинацией Fn+↓ (PageDown). Touch ID браузер не видит. Cmd+Q/W не нажимать 🙂', kbTested:'Проверено: {n} / {t}',
+  camTitle:'Тест камеры', camHint:'Проверьте чёткость, цвета, отсутствие артефактов. Зелёный индикатор рядом с камерой должен гореть.', camErr:'Нет доступа к камере: ',
+  micTitle:'Тест микрофона', micHint:'Говорите — полоска должна реагировать на голос:', micErr:'Нет доступа к микрофону: ',
+  spkTitle:'Тест динамиков', spkHint:'Звук должен идти чисто, без хрипов и дребезга. Для наушников — подключите их и повторите.', spkLeft:'◀ Левый', spkRight:'Правый ▶', spkBoth:'Оба (стерео)', spkSweep:'Свип 200–10000 Гц',
+  batTitle:'Тест зарядки на портах', batHint:'Переставляйте кабель зарядки по очереди в каждый порт — статус должен меняться на «⚡ заряжается». Работает в Chrome; в Safari смотрите на иконку батареи macOS.', batNoApi:'Battery API недоступен в этом браузере — откройте в Chrome или следите за иконкой батареи в строке меню macOS.', batLoading:'Загрузка…', batCharging:'⚡ заряжается', batOnBattery:'🔋 от батареи', batStatus:'Статус', batLevel:'Уровень заряда',
+  padTitle:'Тест трекпада', padHint:'Водите пальцем по всей площади (след рисуется на поле), кликайте в разных местах, попробуйте клик двумя пальцами (правый клик) и скролл двумя пальцами.', padMove:'движение', padLeft:'левый клик', padRight:'клик 2 пальцами', padScroll:'скролл 2 пальцами', padClear:'Очистить поле',
+ }
+},
+es: {
+ sections: { exterior:'Aspecto exterior', serial:'Número de serie y especificaciones', diag:'Diagnóstico de Apple', ports:'Puertos y carga', screen:'Pantalla', media:'Multimedia', wifi:'Wi-Fi y Bluetooth', battery:'Batería', disk:'Almacenamiento', kb:'Teclado', security:'Seguridad y bloqueos ⚠️', passwords:'Contraseñas', trackpad:'Trackpad', fans:'Ventiladores', system:'Sistema' },
+ items: {
+  screws:['Inspeccionar los tornillos','Cabezas rayadas significan que el portátil fue abierto'],
+  flat:['Apoya plano sobre la mesa, sin tambalearse','Un chasis doblado sugiere una caída o una batería hinchada'],
+  lid:['La tapa se abre con una mano, sin holgura',''],
+  coating:['Capa antirreflejo sin manchas','Mirar la pantalla apagada en ángulo (staingate)'],
+  hinge10:['Abrir/cerrar la tapa ~10 veces','Las bisagras no deben chirriar ni atascarse'],
+  liquid:['Sin señales de daño por líquidos','Olor, teclas pegajosas, corrosión en los puertos (usar linterna), manchas bajo las teclas'],
+  snmatch:['El número de serie coincide: sistema, base y caja',' → About This Mac; también grabado en la base e impreso en la caja'],
+  specs:['Las especificaciones coinciden con el anuncio','El chip (M1/M2/M3, Pro/Max), la RAM y el año del modelo en About This Mac deben coincidir con el anuncio'],
+  parts:['Sin avisos de «Unknown Part»','System Settings → General → About — las reparaciones con piezas no originales muestran un aviso en macOS reciente'],
+  truetone:['La opción True Tone está presente','Si falta True Tone en los ajustes de pantalla, a menudo la pantalla fue reemplazada'],
+  diag:['Ejecutar Apple Diagnostics','Apagar → mantener el botón de encendido ~12 s hasta ver opciones → mantener <code>Cmd + D</code>. Debe salir «No issues found»'],
+  chargeports:['La carga funciona en todos los puertos','Cambie el cable de puerto en puerto y observe el estado en la prueba'],
+  typec:['Todos los puertos Type-C transfieren datos','Conecte una memoria USB en cada puerto'],
+  hdmi:['HDMI emite imagen (si el puerto existe)',''],
+  magsafe:['MagSafe y ranura SD funcionan (modelos 2021+)','MagSafe carga y se sujeta magnéticamente; la tarjeta SD se reconoce'],
+  pixels:['Píxeles muertos','Relleno de color a pantalla completa — clic cambia el color, Esc sale'],
+  angles:['Mirar la pantalla desde distintos ángulos','Use las pantallas gris y blanca de la prueba de píxeles — manchas, fugas de luz, quemaduras'],
+  alsensor:['Sensor de luz ambiental','Active el brillo automático, cubra la zona de la cámara con la mano — el brillo debe bajar'],
+  camera:['La cámara funciona',''],
+  mic:['El micrófono funciona',''],
+  speakers:['Altavoces: izquierdo y derecho',''],
+  headphones:['Conector de auriculares','Conecte auriculares y repita la prueba de altavoces'],
+  maxvol:['Volumen máximo sin crujidos','Ejecute el barrido a todo volumen — sin vibraciones ni distorsión'],
+  wifi:['El Wi-Fi conecta y mantiene la red',''],
+  bt:['Bluetooth detecta dispositivos',''],
+  batthealth:['Salud de la batería','System Settings → Battery → Battery Health: «Normal», capacidad máxima ≥ 80%'],
+  cycles:['Ciclos de carga de la batería',' → About This Mac → System Report → Power → Cycle Count. 500–700+ en modelos antiguos = reemplazo pronto. Terminal: <code>system_profiler SPPowerDataType</code>'],
+  storage:['El tamaño del disco coincide con lo anunciado',' → About This Mac → Storage, o Terminal: <code>diskutil info disk0 | grep "Disk Size"</code>'],
+  smart:['Estado SMART: Verified','Terminal: <code>diskutil info disk0 | grep SMART</code>'],
+  diskspeed:['La velocidad del SSD es adecuada','Blackmagic Disk Speed Test — una escritura muy degradada = SSD desgastado'],
+  keys:['Todas las teclas responden','Pulse cada tecla — se pondrá verde'],
+  backlight:['Retroiluminación del teclado','Baje el brillo de la pantalla a cero, active la retroiluminación, incline la pantalla'],
+  touchbar:['La Touch Bar funciona (modelos 2016–2019)','Responde en toda la franja, sin zonas muertas'],
+  findmy:['Desactivar Find My Mac y cerrar sesión de iCloud','System Settings → Apple ID → iCloud → Find My Mac → off (el vendedor introduce su contraseña)'],
+  activation:['Activation Lock: Disabled',' → About This Mac → More Info → System Report → Activation Lock Status'],
+  icloudout:['Sesión de iCloud cerrada','System Settings → Apple ID → Sign Out'],
+  musicout:['Sesión de Apple Music cerrada','Music → Account → Sign Out'],
+  mdmprofiles:['Sin el elemento «Profiles» en System Settings','Su presencia = inscripción MDM corporativa'],
+  mdmprocess:['Sin proceso mdmclient justo tras reiniciar','Reiniciar → Activity Monitor → buscar «mdmclient»'],
+  mdmcli:['Comprobar la inscripción en Terminal','<code>profiles status -type enrollment</code> → debe salir «Enrolled via DEP: No» y «MDM enrollment: No»'],
+  erase:['Borrar antes de la entrega','System Settings → General → Transfer or Reset → Erase All Content and Settings. Después el Mac no debe pedir el Apple ID del dueño anterior — la comprobación final del Activation Lock'],
+  firmware:['Sin contraseña de firmware','Arrancar manteniendo <code>Option</code> (Intel) — no debe pedir contraseña'],
+  recovery:['El modo Recovery arranca','Apple Silicon: apagar, mantener el botón de encendido → Options. También verifica que no hay bloqueo de firmware'],
+  admin:['Contraseña de administrador conocida o eliminada','Terminal: <code>sudo -v</code> — si pide contraseña, el vendedor debe conocerla'],
+  touchid:['Touch ID reconoce la huella','System Settings → Touch ID — registre su propio dedo'],
+  pad:['Cursor, clics y gestos en toda la superficie',''],
+  fans:['Ventiladores al máximo sin rechinar','Instale Macs Fan Control → suba las RPM al máximo → escuche'],
+  sleepwake:['Reposo/despertar funciona','Cierre la tapa, espere un minuto, ábrala — despertar instantáneo, sin pantalla negra ni reinicio. Defecto común tras daño por líquidos'],
+ },
+ ui: {
+  title:'🍎 Comprobación de MacBook usado', term:'⌨️ Pruebas en Terminal', termTitle:'Pruebas en Terminal (sin descargas)', termHint:'Abra Terminal (Cmd+Espacio → «Terminal») y pegue los comandos uno a uno. Los comandos con sudo piden la contraseña de administrador.', copy:'Copiar', copied:'✓ Copiado', pasteTitle:'Resultados de la autocomprobación', pasteHint:'Ejecute el primer comando de «⌨️ Pruebas en Terminal» en el Mac comprobado — el resultado se copia al portapapeles automáticamente. Péguelo aquí: los puntos se marcarán y los avisos y fallos se resaltarán.', apply:'Aplicar', applied:'{n} elementos actualizados', cmdfull:'Autocomprobación completa: imprime PASS/WARN/FAIL y copia el resultado — péguelo en el campo de arriba de la página', cmdmodel:'Modelo, chip, RAM y número de serie', cmdlock:'Activation Lock — debe ser «Disabled»', cmdbattery:'Batería: ciclos y capacidad (max/design ≥ 80%)', cmddisk:'Tamaño del disco y SMART — debe ser «Verified»', cmdmdm:'Inscripción MDM/DEP — ambas respuestas «No»', cmdmdmproc:'Proceso mdmclient — ejecutar justo tras reiniciar', cmdmanaged:'Preferencias administradas — otra señal de MDM', cmdsudocheck:'Contraseña de administrador — el vendedor debe conocerla', cmdfirmware:'Contraseña de firmware (solo Intel) — debe ser «No»', cmdfans:'Velocidad de los ventiladores (rpm)', cmdstress:'Estrés de CPU ~40 s — los ventiladores aceleran, escuche chirridos; se detiene solo', progress:'{d} de {t} comprobaciones hechas', reset:'Restablecer progreso', resetConfirm:'¿Restablecer todo el progreso?', close:'✕ Cerrar', test:'Probar',
+  snPh:'Número de serie ( → About This Mac)', coverage:'Comprobar cobertura en apple.com', snEmpty:'Introduzca primero un número de serie',
+  wifiOn:'Ahora: en línea ✅ — abra varios sitios, compruebe la estabilidad', wifiOff:'Ahora: sin conexión ❌',
+  pixelColors:['Blanco','Negro','Rojo','Verde','Azul','Gris (ángulos de visión)'], pixelHint:'{name} ({i}/{n}) — clic: siguiente color, Esc: salir',
+  kbTitle:'Prueba de teclado', kbHint:'Pulse cada tecla. Amarilla = pulsada, verde = probada. Fn se detecta con Fn+↓ (PageDown). El navegador no ve Touch ID. Evite Cmd+Q/W 🙂', kbTested:'Probadas: {n} / {t}',
+  camTitle:'Prueba de cámara', camHint:'Compruebe nitidez, colores y ausencia de artefactos. El LED verde junto a la cámara debe encenderse.', camErr:'Sin acceso a la cámara: ',
+  micTitle:'Prueba de micrófono', micHint:'Hable — la barra debe reaccionar a su voz:', micErr:'Sin acceso al micrófono: ',
+  spkTitle:'Prueba de altavoces', spkHint:'El sonido debe ser limpio, sin crujidos ni vibraciones. Para auriculares — conéctelos y repita.', spkLeft:'◀ Izquierdo', spkRight:'Derecho ▶', spkBoth:'Ambos (estéreo)', spkSweep:'Barrido 200–10000 Hz',
+  batTitle:'Prueba de carga por puertos', batHint:'Cambie el cable de carga a cada puerto por turno — el estado debe pasar a «⚡ cargando». Funciona en Chrome; en Safari observe el icono de batería de macOS.', batNoApi:'La Battery API no está disponible en este navegador — abra en Chrome u observe el icono de batería en la barra de menús de macOS.', batLoading:'Cargando…', batCharging:'⚡ cargando', batOnBattery:'🔋 con batería', batStatus:'Estado', batLevel:'Nivel de carga',
+  padTitle:'Prueba de trackpad', padHint:'Deslice el dedo por toda la superficie (se dibuja el rastro), haga clic en distintos puntos, pruebe el clic con dos dedos (clic derecho) y el desplazamiento con dos dedos.', padMove:'movimiento', padLeft:'clic izquierdo', padRight:'clic con 2 dedos', padScroll:'scroll con 2 dedos', padClear:'Limpiar campo',
+ }
+},
+de: {
+ sections: { exterior:'Äußerer Zustand', serial:'Seriennummer & Ausstattung', diag:'Apple-Diagnose', ports:'Anschlüsse & Laden', screen:'Bildschirm', media:'Multimedia', wifi:'WLAN & Bluetooth', battery:'Akku', disk:'Speicher', kb:'Tastatur', security:'Sicherheit & Sperren ⚠️', passwords:'Passwörter', trackpad:'Trackpad', fans:'Lüfter', system:'System' },
+ items: {
+  screws:['Schrauben inspizieren','Zerkratzte Schraubenköpfe bedeuten, dass das Gerät geöffnet wurde'],
+  flat:['Liegt flach auf dem Tisch, wackelt nicht','Ein verbogenes Gehäuse deutet auf einen Sturz oder einen aufgeblähten Akku hin'],
+  lid:['Deckel lässt sich mit einer Hand öffnen, ohne Spiel',''],
+  coating:['Antireflex-Beschichtung ohne Flecken','Ausgeschalteten Bildschirm schräg betrachten (Staingate)'],
+  hinge10:['Deckel ~10-mal öffnen/schließen','Scharniere dürfen nicht knarren oder haken'],
+  liquid:['Keine Spuren von Flüssigkeitsschäden','Geruch, klebrige Tasten, Korrosion in den Anschlüssen (Taschenlampe), Flecken unter den Tasten'],
+  snmatch:['Seriennummer stimmt überein: System, Unterseite, Karton',' → About This Mac; auch auf der Unterseite eingraviert und auf dem Karton aufgedruckt'],
+  specs:['Ausstattung entspricht dem Angebot','Chip (M1/M2/M3, Pro/Max), RAM und Modelljahr in About This Mac müssen mit der Anzeige übereinstimmen'],
+  parts:['Keine „Unknown Part“-Warnungen','System Settings → General → About — Reparaturen mit Nicht-Originalteilen zeigen unter neuem macOS eine Warnung'],
+  truetone:['True-Tone-Option vorhanden','Fehlt True Tone in den Display-Einstellungen, wurde das Display oft getauscht'],
+  diag:['Apple Diagnostics ausführen','Ausschalten → Einschalttaste ~12 s halten, bis Optionen erscheinen → <code>Cmd + D</code> halten. Erwartet: „No issues found“'],
+  chargeports:['Laden funktioniert an jedem Anschluss','Ladekabel zwischen den Anschlüssen wechseln und den Status im Test beobachten'],
+  typec:['Alle Type-C-Anschlüsse übertragen Daten','USB-Stick in jeden Anschluss stecken'],
+  hdmi:['HDMI gibt ein Bild aus (falls vorhanden)',''],
+  magsafe:['MagSafe und SD-Slot funktionieren (Modelle 2021+)','MagSafe lädt und haftet magnetisch; SD-Karte wird erkannt'],
+  pixels:['Tote Pixel','Vollbild-Farbfüllung — Klick wechselt die Farbe, Esc beendet'],
+  angles:['Bildschirm aus verschiedenen Winkeln prüfen','Graue und weiße Bildschirme aus dem Pixeltest nutzen — Flecken, Lichthöfe, Einbrennen'],
+  alsensor:['Umgebungslichtsensor','Auto-Helligkeit aktivieren, Kamerabereich mit der Hand abdecken — die Helligkeit muss sinken'],
+  camera:['Kamera funktioniert',''],
+  mic:['Mikrofon funktioniert',''],
+  speakers:['Lautsprecher: links und rechts',''],
+  headphones:['Kopfhöreranschluss','Kopfhörer anschließen und den Lautsprechertest wiederholen'],
+  maxvol:['Maximale Lautstärke ohne Knistern','Sweep bei voller Lautstärke abspielen — kein Klappern, keine Verzerrung'],
+  wifi:['WLAN verbindet sich und hält die Verbindung',''],
+  bt:['Bluetooth findet Geräte',''],
+  batthealth:['Akkuzustand','System Settings → Battery → Battery Health: „Normal“, maximale Kapazität ≥ 80%'],
+  cycles:['Ladezyklen des Akkus',' → About This Mac → System Report → Power → Cycle Count. 500–700+ bei älteren Modellen = baldiger Austausch. Terminal: <code>system_profiler SPPowerDataType</code>'],
+  storage:['Speichergröße wie angegeben',' → About This Mac → Storage, oder Terminal: <code>diskutil info disk0 | grep "Disk Size"</code>'],
+  smart:['SMART-Status: Verified','Terminal: <code>diskutil info disk0 | grep SMART</code>'],
+  diskspeed:['SSD-Geschwindigkeit in Ordnung','Blackmagic Disk Speed Test — stark eingebrochene Schreibrate = verschlissene SSD'],
+  keys:['Jede Taste reagiert','Jede Taste drücken — sie wird grün'],
+  backlight:['Tastaturbeleuchtung','Displayhelligkeit auf null stellen, Beleuchtung einschalten, Bildschirm neigen'],
+  touchbar:['Touch Bar funktioniert (Modelle 2016–2019)','Reagiert über die gesamte Leiste, keine toten Zonen'],
+  findmy:['Find My Mac deaktivieren, dann von iCloud abmelden','System Settings → Apple ID → iCloud → Find My Mac → aus (Verkäufer gibt sein Passwort ein)'],
+  activation:['Activation Lock: Disabled',' → About This Mac → More Info → System Report → Activation Lock Status'],
+  icloudout:['Von iCloud abgemeldet','System Settings → Apple ID → Sign Out'],
+  musicout:['Von Apple Music abgemeldet','Music → Account → Sign Out'],
+  mdmprofiles:['Kein Eintrag „Profiles“ in den System Settings','Vorhandensein = Firmen-MDM-Registrierung'],
+  mdmprocess:['Kein mdmclient-Prozess direkt nach dem Neustart','Neustarten → Activity Monitor → nach „mdmclient“ suchen'],
+  mdmcli:['Registrierung im Terminal prüfen','<code>profiles status -type enrollment</code> → erwartet: „Enrolled via DEP: No“ und „MDM enrollment: No“'],
+  erase:['Vor der Übergabe löschen','System Settings → General → Transfer or Reset → Erase All Content and Settings. Danach darf der Mac nicht nach der Apple ID des Vorbesitzers fragen — die finale Activation-Lock-Prüfung'],
+  firmware:['Kein Firmware-Passwort','Mit gehaltener <code>Option</code>-Taste starten (Intel) — es darf kein Passwort abgefragt werden'],
+  recovery:['Recovery-Modus startet','Apple Silicon: ausschalten, Einschalttaste halten → Options. Prüft zugleich, dass keine Firmware-Sperre besteht'],
+  admin:['Administrator-Passwort bekannt oder entfernt','Terminal: <code>sudo -v</code> — fragt es nach einem Passwort, muss der Verkäufer es kennen'],
+  touchid:['Touch ID erkennt den Fingerabdruck','System Settings → Touch ID — eigenen Finger registrieren'],
+  pad:['Cursor, Klicks und Gesten auf der gesamten Fläche',''],
+  fans:['Lüfter auf Maximum ohne Schleifgeräusche','Macs Fan Control installieren → Drehzahl maximieren → hinhören'],
+  sleepwake:['Ruhezustand/Aufwachen funktioniert','Deckel schließen, eine Minute warten, öffnen — sofortiges Aufwachen, kein schwarzer Bildschirm, kein Neustart. Häufiger Defekt nach Flüssigkeitsschaden'],
+ },
+ ui: {
+  title:'🍎 Gebrauchtes MacBook prüfen', term:'⌨️ Terminal-Checks', termTitle:'Terminal-Checks (ohne Downloads)', termHint:'Terminal öffnen (Cmd+Leertaste → „Terminal“) und die Befehle einzeln einfügen. Befehle mit sudo fragen nach dem Administrator-Passwort.', copy:'Kopieren', copied:'✓ Kopiert', pasteTitle:'Ergebnisse der Auto-Prüfung', pasteHint:'Führen Sie den ersten Befehl aus „⌨️ Terminal-Checks“ auf dem geprüften Mac aus — das Ergebnis wird automatisch in die Zwischenablage kopiert. Hier einfügen: Punkte werden abgehakt, Warnungen und Fehler hervorgehoben.', apply:'Anwenden', applied:'{n} Punkte aktualisiert', cmdfull:'Komplette Auto-Prüfung: gibt PASS/WARN/FAIL aus und kopiert das Ergebnis — oben auf der Seite einfügen', cmdmodel:'Modell, Chip, RAM und Seriennummer', cmdlock:'Activation Lock — erwartet: „Disabled“', cmdbattery:'Akku: Zyklen und Kapazität (max/design ≥ 80%)', cmddisk:'Festplattengröße und SMART — erwartet: „Verified“', cmdmdm:'MDM/DEP-Registrierung — beide Antworten „No“', cmdmdmproc:'mdmclient-Prozess — direkt nach einem Neustart ausführen', cmdmanaged:'Verwaltete Einstellungen — weiteres MDM-Anzeichen', cmdsudocheck:'Administrator-Passwort — der Verkäufer muss es kennen', cmdfirmware:'Firmware-Passwort (nur Intel) — erwartet: „No“', cmdfans:'Lüfterdrehzahl (rpm)', cmdstress:'CPU-Stress ~40 s — Lüfter drehen hoch, auf Schleifgeräusche hören; stoppt von selbst', progress:'{d} von {t} Prüfungen erledigt', reset:'Fortschritt zurücksetzen', resetConfirm:'Gesamten Fortschritt zurücksetzen?', close:'✕ Schließen', test:'Test',
+  snPh:'Seriennummer ( → About This Mac)', coverage:'Abdeckung auf apple.com prüfen', snEmpty:'Bitte zuerst eine Seriennummer eingeben',
+  wifiOn:'Jetzt: online ✅ — einige Seiten öffnen, Stabilität prüfen', wifiOff:'Jetzt: offline ❌',
+  pixelColors:['Weiß','Schwarz','Rot','Grün','Blau','Grau (Blickwinkel)'], pixelHint:'{name} ({i}/{n}) — Klick: nächste Farbe, Esc: beenden',
+  kbTitle:'Tastaturtest', kbHint:'Jede Taste drücken. Gelb = gedrückt, grün = getestet. Fn wird über Fn+↓ (PageDown) erkannt. Touch ID sieht der Browser nicht. Cmd+Q/W vermeiden 🙂', kbTested:'Getestet: {n} / {t}',
+  camTitle:'Kameratest', camHint:'Schärfe, Farben und Artefaktfreiheit prüfen. Die grüne LED neben der Kamera muss leuchten.', camErr:'Kein Kamerazugriff: ',
+  micTitle:'Mikrofontest', micHint:'Sprechen Sie — der Balken muss auf Ihre Stimme reagieren:', micErr:'Kein Mikrofonzugriff: ',
+  spkTitle:'Lautsprechertest', spkHint:'Der Klang muss sauber sein, ohne Knistern oder Klappern. Für Kopfhörer — anschließen und wiederholen.', spkLeft:'◀ Links', spkRight:'Rechts ▶', spkBoth:'Beide (Stereo)', spkSweep:'Sweep 200–10000 Hz',
+  batTitle:'Ladetest der Anschlüsse', batHint:'Ladekabel der Reihe nach in jeden Anschluss stecken — der Status muss auf „⚡ lädt“ wechseln. Funktioniert in Chrome; in Safari das Akku-Symbol von macOS beobachten.', batNoApi:'Die Battery API ist in diesem Browser nicht verfügbar — in Chrome öffnen oder das Akku-Symbol in der macOS-Menüleiste beobachten.', batLoading:'Laden…', batCharging:'⚡ lädt', batOnBattery:'🔋 im Akkubetrieb', batStatus:'Status', batLevel:'Ladestand',
+  padTitle:'Trackpad-Test', padHint:'Mit dem Finger über die gesamte Fläche fahren (die Spur wird gezeichnet), an verschiedenen Stellen klicken, Zwei-Finger-Klick (Rechtsklick) und Zwei-Finger-Scrollen ausprobieren.', padMove:'Bewegung', padLeft:'Linksklick', padRight:'Zwei-Finger-Klick', padScroll:'Zwei-Finger-Scroll', padClear:'Feld leeren',
+ }
+},
+};
+
+// ---------- state ----------
+const LS_KEY = 'macbook-check', LS_LANG = 'macbook-check-lang', LS_SN = 'macbook-check-sn';
+const state = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+const AUTO_KEY = 'macbook-check-auto';
+const statuses = JSON.parse(localStorage.getItem(AUTO_KEY) || '{}');
+let lang = localStorage.getItem(LS_LANG) || 'en';
+if (!I18N[lang]) lang = 'en';
+const L = () => I18N[lang];
+const fmt = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+
+// ---------- render ----------
+function render() {
+  closeModal();
+  const { sections, items, ui } = L();
+  document.documentElement.lang = lang;
+  document.title = ui.title.replace('🍎 ', '');
+  document.getElementById('apptitle').textContent = ui.title;
+  document.getElementById('modalclose').textContent = ui.close;
+  document.getElementById('termbtn').textContent = ui.term;
+  let html = `<section><h2>${ui.pasteTitle}</h2><p class="hint">${ui.pasteHint}</p><textarea id="pastearea" placeholder="activation=pass&#10;cycles=warn 670"></textarea><div class="btnrow"><button id="applyBtn">${ui.apply}</button></div><p class="hint" id="applyres"></p></section>`;
+  for (const [secId, secItems] of SECTIONS) {
+    html += `<section><h2>${sections[secId]}</h2>`;
+    if (secId === 'serial') {
+      html += `<div class="snrow"><input id="sninput" placeholder="${ui.snPh}"><button id="coverageBtn">${ui.coverage}</button></div>`;
+    }
+    html += '<ul>';
+    for (const it of secItems) {
+      const [id, test] = Array.isArray(it) ? it : [it, null];
+      const [label, hint] = items[id];
+      html += `<li data-id="${id}"><input type="checkbox"><label>${label}${badge(id)}` +
+        (hint ? `<span class="hint">${hint}</span>` : '') +
+        (id === 'wifi' ? `<span class="hint" id="wifistatus"></span>` : '') +
+        `</label>` +
+        (test ? `<button class="test" data-test="${test}">${ui.test}</button>` : '') +
+        `</li>`;
+    }
+    html += '</ul></section>';
+  }
+  html += `<button id="resetBtn">${ui.reset}</button>`;
+  document.getElementById('main').innerHTML = html;
+
+  document.querySelectorAll('li[data-id]').forEach(li => {
+    const cb = li.querySelector('input');
+    cb.checked = !!state[li.dataset.id];
+    li.classList.toggle('done', cb.checked);
+    cb.addEventListener('change', () => {
+      state[li.dataset.id] = cb.checked;
+      li.classList.toggle('done', cb.checked);
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      updateProgress();
+    });
+  });
+  document.querySelectorAll('button[data-test]').forEach(btn => {
+    btn.onclick = () => tests[btn.dataset.test]();
+  });
+  document.getElementById('resetBtn').onclick = () => {
+    if (confirm(L().ui.resetConfirm)) {
+      localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(AUTO_KEY);
+      location.reload();
+    }
+  };
+  // serial
+  const sn = document.getElementById('sninput');
+  sn.value = localStorage.getItem(LS_SN) || '';
+  sn.addEventListener('input', () => localStorage.setItem(LS_SN, sn.value.trim().toUpperCase()));
+  document.getElementById('coverageBtn').onclick = () => {
+    const v = sn.value.trim().toUpperCase();
+    if (!v) { alert(L().ui.snEmpty); sn.focus(); return; }
+    window.open('https://checkcoverage.apple.com/?sn=' + encodeURIComponent(v), '_blank');
+  };
+  document.getElementById('applyBtn').onclick = applyPaste;
+  updateProgress();
+  wifiUpd();
+}
+
+function updateProgress() {
+  const items = document.querySelectorAll('li[data-id]');
+  const done = [...items].filter(li => li.querySelector('input').checked).length;
+  document.getElementById('progressfill').style.width = (done / items.length * 100) + '%';
+  document.getElementById('progresstext').textContent = fmt(L().ui.progress, { d: done, t: items.length });
+}
+
+// ---------- language ----------
+const langsel = document.getElementById('langsel');
+langsel.value = lang;
+langsel.onchange = () => {
+  lang = langsel.value;
+  localStorage.setItem(LS_LANG, lang);
+  render();
+};
+
+// ---------- modal ----------
+const modal = document.getElementById('modal');
+const modalContent = document.getElementById('modalcontent');
+let modalCleanup = null;
+function openModal(html) { modalContent.innerHTML = html; modal.classList.add('open'); }
+function closeModal() {
+  modal.classList.remove('open');
+  modalContent.innerHTML = '';
+  if (modalCleanup) { modalCleanup(); modalCleanup = null; }
+}
+document.getElementById('modalclose').onclick = closeModal;
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+const tests = {};
+
+// ---------- dead pixels ----------
+const COLORS = ['#fff', '#000', '#f00', '#0f0', '#00f', '#808080'];
+tests.pixels = () => {
+  const el = document.getElementById('pixeltest');
+  let i = 0;
+  const show = () => {
+    el.style.background = COLORS[i];
+    document.getElementById('pixelhint').textContent =
+      fmt(L().ui.pixelHint, { name: L().ui.pixelColors[i], i: i + 1, n: COLORS.length });
+  };
+  el.style.display = 'block';
+  show();
+  el.requestFullscreen && el.requestFullscreen().catch(() => {});
+  el.onclick = () => { i = (i + 1) % COLORS.length; show(); };
+  const exit = () => {
+    if (!document.fullscreenElement) {
+      el.style.display = 'none';
+      document.removeEventListener('fullscreenchange', exit);
+    }
+  };
+  document.addEventListener('fullscreenchange', exit);
+};
+
+// ---------- keyboard ----------
+const KB_ROWS = [
+  [['Escape','esc'],['F1','F1'],['F2','F2'],['F3','F3'],['F4','F4'],['F5','F5'],['F6','F6'],['F7','F7'],['F8','F8'],['F9','F9'],['F10','F10'],['F11','F11'],['F12','F12']],
+  [['Backquote','`'],['Digit1','1'],['Digit2','2'],['Digit3','3'],['Digit4','4'],['Digit5','5'],['Digit6','6'],['Digit7','7'],['Digit8','8'],['Digit9','9'],['Digit0','0'],['Minus','-'],['Equal','='],['Backspace','⌫','wide']],
+  [['Tab','tab','wide'],['KeyQ','Q'],['KeyW','W'],['KeyE','E'],['KeyR','R'],['KeyT','T'],['KeyY','Y'],['KeyU','U'],['KeyI','I'],['KeyO','O'],['KeyP','P'],['BracketLeft','['],['BracketRight',']'],['Backslash','\\']],
+  [['CapsLock','caps','xwide'],['KeyA','A'],['KeyS','S'],['KeyD','D'],['KeyF','F'],['KeyG','G'],['KeyH','H'],['KeyJ','J'],['KeyK','K'],['KeyL','L'],['Semicolon',';'],['Quote','\''],['Enter','⏎','wide']],
+  [['ShiftLeft','⇧','xwide'],['KeyZ','Z'],['KeyX','X'],['KeyC','C'],['KeyV','V'],['KeyB','B'],['KeyN','N'],['KeyM','M'],['Comma',','],['Period','.'],['Slash','/'],['ShiftRight','⇧','xwide']],
+  [['Fn','fn'],['ControlLeft','ctrl'],['AltLeft','opt'],['MetaLeft','cmd','wide'],['Space','space','space'],['MetaRight','cmd','wide'],['AltRight','opt'],['ArrowLeft','←'],['ArrowUp','↑'],['ArrowDown','↓'],['ArrowRight','→']],
+];
+tests.keyboard = () => {
+  const ui = L().ui;
+  let html = `<h3>${ui.kbTitle}</h3><p class="hint">${ui.kbHint}</p><div id="kb">`;
+  for (const row of KB_ROWS) {
+    html += '<div class="kbrow">';
+    for (const [code, label, cls] of row)
+      html += `<div class="key ${cls || ''}" data-code="${code}">${label}</div>`;
+    html += '</div>';
+  }
+  html += '</div><p id="kbcount" class="hint"></p>';
+  openModal(html);
+  const total = document.querySelectorAll('#kb .key').length;
+  const count = () => {
+    const n = document.querySelectorAll('#kb .key.tested').length;
+    document.getElementById('kbcount').textContent = fmt(ui.kbTested, { n, t: total });
+  };
+  count();
+  const down = e => {
+    e.preventDefault();
+    // Fn не шлёт событий сама — ловим её по Fn+стрелкам (PageUp/PageDown/Home/End)
+    if (/^(PageUp|PageDown|Home|End)$/.test(e.code)) {
+      const f = modalContent.querySelector('.key[data-code="Fn"]');
+      if (f && !f.classList.contains('tested')) { f.classList.add('tested'); count(); }
+    }
+    const k = modalContent.querySelector(`.key[data-code="${e.code}"]`);
+    if (k) k.classList.add('pressed');
+  };
+  const up = e => {
+    const k = modalContent.querySelector(`.key[data-code="${e.code}"]`);
+    if (k) { k.classList.remove('pressed'); k.classList.add('tested'); count(); }
+  };
+  window.addEventListener('keydown', down);
+  window.addEventListener('keyup', up);
+  modalCleanup = () => {
+    window.removeEventListener('keydown', down);
+    window.removeEventListener('keyup', up);
+  };
+};
+
+// ---------- camera ----------
+tests.camera = async () => {
+  const ui = L().ui;
+  openModal(`<h3>${ui.camTitle}</h3><video autoplay playsinline muted></video><p class="hint">${ui.camHint}</p>`);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    modalContent.querySelector('video').srcObject = stream;
+    modalCleanup = () => stream.getTracks().forEach(t => t.stop());
+  } catch (e) {
+    modalContent.innerHTML += `<p style="color:#d70015">${ui.camErr}${e.message}</p>`;
+  }
+};
+
+// ---------- microphone ----------
+tests.mic = async () => {
+  const ui = L().ui;
+  openModal(`<h3>${ui.micTitle}</h3><p>${ui.micHint}</p><div id="miclevel"><div id="micfill"></div></div>`);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new AudioContext();
+    const analyser = ctx.createAnalyser();
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let raf;
+    const loop = () => {
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      const fill = document.getElementById('micfill');
+      if (fill) fill.style.width = Math.min(100, avg * 1.5) + '%';
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    modalCleanup = () => { cancelAnimationFrame(raf); stream.getTracks().forEach(t => t.stop()); ctx.close(); };
+  } catch (e) {
+    modalContent.innerHTML += `<p style="color:#d70015">${ui.micErr}${e.message}</p>`;
+  }
+};
+
+// ---------- speakers ----------
+tests.speakers = () => {
+  const ui = L().ui;
+  openModal(`<h3>${ui.spkTitle}</h3>
+    <p>${ui.spkHint}</p>
+    <div class="btnrow">
+      <button data-pan="-1">${ui.spkLeft}</button>
+      <button data-pan="1">${ui.spkRight}</button>
+      <button data-pan="0">${ui.spkBoth}</button>
+      <button data-pan="sweep">${ui.spkSweep}</button>
+    </div>`);
+  const ctx = new AudioContext();
+  modalContent.querySelectorAll('[data-pan]').forEach(b => {
+    b.onclick = () => {
+      const osc = ctx.createOscillator();
+      const pan = ctx.createStereoPanner();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.3;
+      osc.connect(gain).connect(pan).connect(ctx.destination);
+      if (b.dataset.pan === 'sweep') {
+        osc.frequency.setValueAtTime(200, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10000, ctx.currentTime + 3);
+        pan.pan.value = 0;
+        osc.start(); osc.stop(ctx.currentTime + 3);
+      } else {
+        osc.frequency.value = 440;
+        pan.pan.value = +b.dataset.pan;
+        osc.start(); osc.stop(ctx.currentTime + 1.2);
+      }
+    };
+  });
+  modalCleanup = () => ctx.close();
+};
+
+// ---------- charging / battery ----------
+tests.battery = async () => {
+  const ui = L().ui;
+  openModal(`<h3>${ui.batTitle}</h3><div id="batteryinfo">${ui.batLoading}</div><p class="hint">${ui.batHint}</p>`);
+  if (!navigator.getBattery) {
+    document.getElementById('batteryinfo').textContent = ui.batNoApi;
+    return;
+  }
+  const b = await navigator.getBattery();
+  const render = () => {
+    const el = document.getElementById('batteryinfo');
+    if (el) el.innerHTML =
+      `${ui.batStatus}: <b>${b.charging ? ui.batCharging : ui.batOnBattery}</b><br>${ui.batLevel}: <b>${Math.round(b.level * 100)}%</b>`;
+  };
+  render();
+  b.addEventListener('chargingchange', render);
+  b.addEventListener('levelchange', render);
+  modalCleanup = () => {
+    b.removeEventListener('chargingchange', render);
+    b.removeEventListener('levelchange', render);
+  };
+};
+
+// ---------- trackpad ----------
+tests.trackpad = () => {
+  const ui = L().ui;
+  openModal(`<h3>${ui.padTitle}</h3>
+    <p class="hint">${ui.padHint}</p>
+    <canvas id="padcanvas"></canvas>
+    <div class="padstats">
+      <span id="st-move">${ui.padMove}</span>
+      <span id="st-left">${ui.padLeft}</span>
+      <span id="st-right">${ui.padRight}</span>
+      <span id="st-scroll">${ui.padScroll}</span>
+    </div>
+    <div class="btnrow"><button id="padclear" class="secondary">${ui.padClear}</button></div>`);
+  const cv = document.getElementById('padcanvas');
+  cv.width = cv.clientWidth * devicePixelRatio;
+  cv.height = 260 * devicePixelRatio;
+  const g = cv.getContext('2d');
+  g.scale(devicePixelRatio, devicePixelRatio);
+  g.strokeStyle = '#0071e3'; g.lineWidth = 2; g.lineCap = 'round';
+  const ok = id => document.getElementById(id)?.classList.add('ok');
+  let last = null;
+  cv.addEventListener('pointermove', e => {
+    ok('st-move');
+    const r = cv.getBoundingClientRect();
+    const p = [e.clientX - r.left, e.clientY - r.top];
+    if (last) { g.beginPath(); g.moveTo(...last); g.lineTo(...p); g.stroke(); }
+    last = p;
+  });
+  cv.addEventListener('pointerleave', () => last = null);
+  cv.addEventListener('click', () => ok('st-left'));
+  cv.addEventListener('contextmenu', e => { e.preventDefault(); ok('st-right'); });
+  cv.addEventListener('wheel', e => { e.preventDefault(); ok('st-scroll'); }, { passive: false });
+  document.getElementById('padclear').onclick = () => g.clearRect(0, 0, cv.width, cv.height);
+};
+
+// ---------- wifi status ----------
+function wifiUpd() {
+  const el = document.getElementById('wifistatus');
+  if (el) el.textContent = navigator.onLine ? L().ui.wifiOn : L().ui.wifiOff;
+}
+window.addEventListener('online', wifiUpd);
+window.addEventListener('offline', wifiUpd);
+
+// ---------- terminal commands ----------
+const TERM_CMDS = [
+ ['full', `bash <<'MACCHECK_EOF'
+R=""
+add(){ R="$R$1
+"; echo "$1"; }
+HW=$(system_profiler SPHardwareDataType 2>/dev/null)
+AL=$(printf '%s' "$HW" | awk -F': ' '/Activation Lock/{print $2}')
+case "$AL" in
+ *Disabled*) add "activation=pass";;
+ "") add "activation=warn no data";;
+ *) add "activation=fail $AL";;
+esac
+SN=$(printf '%s' "$HW" | awk -F': ' '/Serial Number/{print $2; exit}')
+[ -n "$SN" ] && add "serial=note $SN"
+BAT=$(ioreg -r -c AppleSmartBattery 2>/dev/null)
+CYC=$(printf '%s' "$BAT" | awk '/"CycleCount" =/{print $3; exit}')
+DES=$(printf '%s' "$BAT" | awk '/"DesignCapacity" =/{print $3; exit}')
+MAX=$(printf '%s' "$BAT" | awk '/"AppleRawMaxCapacity" =/{print $3; exit}')
+[ -z "$MAX" ] && MAX=$(printf '%s' "$BAT" | awk '/"NominalChargeCapacity" =/{print $3; exit}')
+if [ -n "$MAX" ] && [ -n "$DES" ] && [ "$DES" -gt 0 ]; then
+  PCT=$((MAX*100/DES))
+  if [ $PCT -ge 80 ]; then add "batthealth=pass $PCT%"; else add "batthealth=fail $PCT%"; fi
+fi
+if [ -n "$CYC" ]; then
+  if [ "$CYC" -lt 500 ]; then add "cycles=pass $CYC"; else add "cycles=warn $CYC"; fi
+fi
+DISK=$(diskutil info disk0 2>/dev/null)
+SIZE=$(printf '%s' "$DISK" | awk -F': *' '/Disk Size/{print $2}' | awk '{print $1, $2}')
+[ -n "$SIZE" ] && add "storage=note $SIZE"
+SMART=$(printf '%s' "$DISK" | awk -F': *' '/SMART Status/{print $2}')
+case "$SMART" in
+ Verified) add "smart=pass";;
+ "") add "smart=warn no data";;
+ *) add "smart=fail $SMART";;
+esac
+ENR=$(profiles status -type enrollment 2>/dev/null)
+if printf '%s' "$ENR" | grep -q "DEP: No" && printf '%s' "$ENR" | grep -q "enrollment: No"; then
+  add "mdmcli=pass"
+elif [ -z "$ENR" ]; then
+  add "mdmcli=warn no output"
+else
+  add "mdmcli=fail $(printf '%s' "$ENR" | tr '\n' ' ')"
+fi
+if pgrep -x mdmclient >/dev/null; then add "mdmprocess=warn running"; else add "mdmprocess=pass"; fi
+if [ -d "/Library/Managed Preferences" ] && [ -n "$(ls -A '/Library/Managed Preferences' 2>/dev/null)" ]; then
+  add "mdmprofiles=warn managed prefs found"
+else
+  add "mdmprofiles=pass"
+fi
+if [ "$(uname -m)" = "arm64" ]; then
+  add "firmware=pass Apple Silicon (n/a)"
+else
+  FW=$(sudo firmwarepasswd -check 2>/dev/null)
+  case "$FW" in
+   *No*) add "firmware=pass";;
+   *Yes*) add "firmware=fail set";;
+   *) add "firmware=warn no data";;
+  esac
+fi
+printf '%s' "$R" | pbcopy
+echo "--- copied to clipboard / скопировано в буфер ---"
+MACCHECK_EOF`],
+ ['model', `system_profiler SPHardwareDataType | grep -E "Model|Chip|Processor|Memory|Serial"`],
+ ['lock', `system_profiler SPHardwareDataType | grep "Activation Lock"`],
+ ['battery', `ioreg -r -c AppleSmartBattery | grep -E '"(CycleCount|DesignCapacity|AppleRawMaxCapacity|NominalChargeCapacity)" ='`],
+ ['disk', `diskutil info disk0 | grep -E "Disk Size|SMART"`],
+ ['mdm', `profiles status -type enrollment`],
+ ['mdmproc', `pgrep -x mdmclient || echo "OK: mdmclient not running"`],
+ ['managed', `ls "/Library/Managed Preferences" 2>/dev/null || echo "OK: no managed preferences"`],
+ ['sudocheck', `sudo -v`],
+ ['firmware', `sudo firmwarepasswd -check`],
+ ['fans', `sudo powermetrics -s smc -n 1 | grep -i fan`],
+ ['stress', `for i in $(seq $(sysctl -n hw.ncpu)); do yes >/dev/null & done; sleep 40; killall yes`],
+];
+function openTerm() {
+  const ui = L().ui;
+  let html = `<h3>${ui.termTitle}</h3><p class="hint">${ui.termHint}</p>`;
+  for (const [key, cmd] of TERM_CMDS) {
+    html += `<p style="margin:10px 0 4px">${ui['cmd' + key]}</p>` +
+      `<div class="cmdrow"><pre class="cmd">${cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>` +
+      `<button class="test" data-copy>${ui.copy}</button></div>`;
+  }
+  openModal(html);
+  modalContent.querySelectorAll('[data-copy]').forEach((b, i) => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(TERM_CMDS[i][1]); }
+      catch {
+        const t = document.createElement('textarea');
+        t.value = TERM_CMDS[i][1];
+        document.body.appendChild(t); t.select();
+        document.execCommand('copy'); t.remove();
+      }
+      b.textContent = ui.copied;
+      setTimeout(() => { b.textContent = ui.copy; }, 1500);
+    };
+  });
+}
+document.getElementById('termbtn').onclick = openTerm;
+
+// ---------- auto-check paste ----------
+function badge(id) {
+  const a = statuses[id];
+  if (!a) return '';
+  const icon = { pass: '✔', warn: '⚠', fail: '✘', note: 'ℹ' }[a.s] || '';
+  return ` <span class="autonote ${a.s}">${icon}${a.v ? ' ' + a.v : ''}</span>`;
+}
+function applyPaste() {
+  const area = document.getElementById('pastearea');
+  let n = 0;
+  for (const line of area.value.split('\n')) {
+    const m = line.trim().match(/^([a-z]+)=(pass|warn|fail|note)\s*(.*)$/i);
+    if (!m) continue;
+    const id = m[1].toLowerCase(), st = m[2].toLowerCase(), v = m[3].trim();
+    if (id === 'serial') { if (v) { localStorage.setItem(LS_SN, v.toUpperCase()); n++; } continue; }
+    if (!I18N.en.items[id]) continue;
+    if (st === 'pass' || st === 'warn') state[id] = true;
+    if (st === 'fail') state[id] = false;
+    statuses[id] = { s: st, v };
+    n++;
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  localStorage.setItem(AUTO_KEY, JSON.stringify(statuses));
+  const keep = area.value;
+  render();
+  document.getElementById('pastearea').value = keep;
+  document.getElementById('applyres').textContent = fmt(L().ui.applied, { n });
+}
+
+render();
+</script>
+</body>
+</html>
