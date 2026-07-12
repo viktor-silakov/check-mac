@@ -430,6 +430,8 @@ function encodeShare() {
     history.replaceState(null, '', location.pathname + location.search);
   } catch (e) { /* битая ссылка — игнорируем */ }
 })();
+// открытие share-ссылки поверх уже открытой страницы (меняется только хэш)
+window.addEventListener('hashchange', () => { if (location.hash.includes('s=')) location.reload(); });
 
 // ---------- render ----------
 function render() {
