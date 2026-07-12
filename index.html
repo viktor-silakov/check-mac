@@ -73,6 +73,8 @@
   .autonote.warn { background:#fff3cd; color:#8a6d00; }
   .autonote.fail { background:#ffe0e0; color:#c00; }
   .autonote.note { background:#e8e8ed; color:#555; }
+  li.crit { border-left:3px solid #d70015; padding-left:10px; }
+  .critchip { font-size:11px; background:#d70015; color:#fff; border-radius:6px; padding:1px 6px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -115,16 +117,18 @@ const SECTIONS = [
   ['battery',  ['batthealth','cycles']],
   ['disk',     ['storage','smart','diskspeed']],
   ['kb',       [['keys','keyboard'],'backlight','touchbar']],
-  ['security', ['findmy','activation','icloudout','musicout','mdmprofiles','mdmprocess','mdmcli','erase']],
-  ['passwords',['firmware','recovery','admin']],
+  ['security', ['mdmprofiles','mdmprocess','mdmcli']],
   ['trackpad', ['touchid',['pad','trackpad']]],
   ['fans',     ['fans']],
-  ['system',   ['sleepwake']],
+  ['system',   ['sleepwake','recovery']],
+  ['handover', ['findmy','icloudout','musicout','activation','firmware','admin','erase']],
 ];
+// пункты, из-за которых чаще всего теряют деньги
+const CRIT = new Set(['activation','findmy','erase','mdmcli']);
 
 const I18N = {
 en: {
- sections: { exterior:'Exterior', serial:'Serial number & specs', diag:'Apple Diagnostics', ports:'Ports & charging', screen:'Screen', media:'Multimedia', wifi:'Wi-Fi & Bluetooth', battery:'Battery', disk:'Storage', kb:'Keyboard', security:'Security & locks ⚠️', passwords:'Passwords', trackpad:'Trackpad', fans:'Fans', system:'System' },
+ sections: { exterior:'Exterior', serial:'Serial number & specs', diag:'Apple Diagnostics', ports:'Ports & charging', screen:'Screen', media:'Multimedia', wifi:'Wi-Fi & Bluetooth', battery:'Battery', disk:'Storage', kb:'Keyboard', security:'MDM & corporate locks', handover:'Before you pay — unlink & handover ⚠️', trackpad:'Trackpad', fans:'Fans', system:'System' },
  items: {
   screws:['Inspect the screws','Scratched screw heads mean the laptop has been opened'],
   flat:['Sits flat on the table, does not wobble','A bent body suggests a drop or a swollen battery'],
@@ -176,7 +180,7 @@ en: {
   sleepwake:['Sleep/wake works','Close the lid, wait a minute, open — instant wake, no black screen or reboot. A common defect after liquid damage'],
  },
  ui: {
-  title:'🍎 Used MacBook Checker', term:'⌨️ Terminal checks', termTitle:'Terminal checks (no downloads needed)', termHint:'Open Terminal (Cmd+Space → “Terminal”) and paste the commands one by one. Commands with sudo ask for the admin password.', copy:'Copy', copied:'✓ Copied', pasteTitle:'Auto-check results', pasteHint:'Run the first command from “⌨️ Terminal checks” on the Mac being tested — the result is copied to the clipboard automatically. Paste it here: matching items get checked, warnings and failures are highlighted.', apply:'Apply', applied:'{n} items updated', cmdfull:'Full auto-check: prints PASS/WARN/FAIL and copies the result — paste it into the field at the top of the page', cmdmodel:'Model, chip, RAM and serial number', cmdlock:'Activation Lock — expect “Disabled”', cmdbattery:'Battery: cycle count and capacity (max/design ≥ 80%)', cmddisk:'Disk size and SMART status — expect “Verified”', cmdmdm:'MDM/DEP enrollment — expect “No” twice', cmdmdmproc:'mdmclient process — run right after a reboot', cmdmanaged:'Managed preferences — another MDM sign', cmdsudocheck:'Admin password — the seller must know it', cmdfirmware:'Firmware password (Intel only) — expect “No”', cmdfans:'Fan speed (rpm)', cmdstress:'CPU stress ~40 s — fans spin up, listen for grinding; stops by itself', progress:'{d} of {t} checks done', reset:'Reset progress', resetConfirm:'Reset all progress?', close:'✕ Close', test:'Test',
+  title:'🍎 Used MacBook Checker', term:'⌨️ Terminal checks', termTitle:'Terminal checks (no downloads needed)', termHint:'Open Terminal (Cmd+Space → “Terminal”) and paste the commands one by one. Commands with sudo ask for the admin password.', copy:'Copy', copied:'✓ Copied', pasteTitle:'Auto-check results', pasteHint:'Run the first command from “⌨️ Terminal checks” on the Mac being tested — the result is copied to the clipboard automatically. Paste it here: matching items get checked, warnings and failures are highlighted.', apply:'Apply', applied:'{n} items updated', crit:'critical', cmdfull:'Full auto-check: prints PASS/WARN/FAIL and copies the result — paste it into the field at the top of the page', cmdmodel:'Model, chip, RAM and serial number', cmdlock:'Activation Lock — expect “Disabled”', cmdbattery:'Battery: cycle count and capacity (max/design ≥ 80%)', cmddisk:'Disk size and SMART status — expect “Verified”', cmdmdm:'MDM/DEP enrollment — expect “No” twice', cmdmdmproc:'mdmclient process — run right after a reboot', cmdmanaged:'Managed preferences — another MDM sign', cmdsudocheck:'Admin password — the seller must know it', cmdfirmware:'Firmware password (Intel only) — expect “No”', cmdfans:'Fan speed (rpm)', cmdstress:'CPU stress ~40 s — fans spin up, listen for grinding; stops by itself', progress:'{d} of {t} checks done', reset:'Reset progress', resetConfirm:'Reset all progress?', close:'✕ Close', test:'Test',
   snPh:'Serial number ( → About This Mac)', coverage:'Check coverage on apple.com', snEmpty:'Enter a serial number first',
   wifiOn:'Now: online ✅ — open a few sites, check stability', wifiOff:'Now: offline ❌',
   pixelColors:['White','Black','Red','Green','Blue','Gray (viewing angles)'], pixelHint:'{name} ({i}/{n}) — click: next color, Esc: exit',
@@ -189,7 +193,7 @@ en: {
  }
 },
 ru: {
- sections: { exterior:'Внешний вид', serial:'Серийный номер и характеристики', diag:'Диагностика Apple', ports:'Порты и зарядка', screen:'Экран', media:'Мультимедиа', wifi:'Wi-Fi и Bluetooth', battery:'Батарея', disk:'Диск', kb:'Клавиатура', security:'Защита и блокировки ⚠️', passwords:'Пароли', trackpad:'Трекпад', fans:'Вентиляторы', system:'Система' },
+ sections: { exterior:'Внешний вид', serial:'Серийный номер и характеристики', diag:'Диагностика Apple', ports:'Порты и зарядка', screen:'Экран', media:'Мультимедиа', wifi:'Wi-Fi и Bluetooth', battery:'Батарея', disk:'Диск', kb:'Клавиатура', security:'MDM и корпоративные блокировки', handover:'Перед оплатой — отвязка и передача ⚠️', trackpad:'Трекпад', fans:'Вентиляторы', system:'Система' },
  items: {
   screws:['Осмотреть винты','Царапины на шлицах = ноутбук вскрывали'],
   flat:['Ровно лежит на столе, не шатается','Изгиб корпуса — признак падения или вздутой батареи'],
@@ -241,7 +245,7 @@ ru: {
   sleepwake:['Сон/пробуждение работают','Закрыть крышку, подождать минуту, открыть — мгновенное пробуждение, без чёрного экрана и перезагрузки. Частый дефект после залития'],
  },
  ui: {
-  title:'🍎 Проверка б/у MacBook', term:'⌨️ Проверки в Терминале', termTitle:'Проверки в Терминале (без скачиваний)', termHint:'Откройте Терминал (Cmd+Space → «Terminal») и вставляйте команды по одной. Команды с sudo попросят пароль администратора.', copy:'Копировать', copied:'✓ Скопировано', pasteTitle:'Результаты автопроверки', pasteHint:'Выполните первую команду из «⌨️ Проверки в Терминале» на проверяемом Mac — результат сам скопируется в буфер. Вставьте его сюда: пункты отметятся, предупреждения и провалы подсветятся.', apply:'Применить', applied:'{n} пунктов обновлено', cmdfull:'Полная автопроверка: печатает PASS/WARN/FAIL и копирует результат — вставьте его в поле вверху страницы', cmdmodel:'Модель, чип, RAM и серийный номер', cmdlock:'Activation Lock — должно быть «Disabled»', cmdbattery:'Батарея: циклы и ёмкость (max/design ≥ 80%)', cmddisk:'Размер диска и SMART — должно быть «Verified»', cmdmdm:'MDM/DEP регистрация — оба ответа «No»', cmdmdmproc:'Процесс mdmclient — запускать сразу после перезагрузки', cmdmanaged:'Управляемые настройки — ещё один признак MDM', cmdsudocheck:'Пароль администратора — продавец должен его знать', cmdfirmware:'Firmware-пароль (только Intel) — должно быть «No»', cmdfans:'Обороты вентиляторов (rpm)', cmdstress:'Стресс CPU ~40 сек — вентиляторы раскрутятся, слушайте скрежет; остановится сам', progress:'{d} из {t} проверок выполнено', reset:'Сбросить прогресс', resetConfirm:'Сбросить весь прогресс?', close:'✕ Закрыть', test:'Тест',
+  title:'🍎 Проверка б/у MacBook', term:'⌨️ Проверки в Терминале', termTitle:'Проверки в Терминале (без скачиваний)', termHint:'Откройте Терминал (Cmd+Space → «Terminal») и вставляйте команды по одной. Команды с sudo попросят пароль администратора.', copy:'Копировать', copied:'✓ Скопировано', pasteTitle:'Результаты автопроверки', pasteHint:'Выполните первую команду из «⌨️ Проверки в Терминале» на проверяемом Mac — результат сам скопируется в буфер. Вставьте его сюда: пункты отметятся, предупреждения и провалы подсветятся.', apply:'Применить', applied:'{n} пунктов обновлено', crit:'критично', cmdfull:'Полная автопроверка: печатает PASS/WARN/FAIL и копирует результат — вставьте его в поле вверху страницы', cmdmodel:'Модель, чип, RAM и серийный номер', cmdlock:'Activation Lock — должно быть «Disabled»', cmdbattery:'Батарея: циклы и ёмкость (max/design ≥ 80%)', cmddisk:'Размер диска и SMART — должно быть «Verified»', cmdmdm:'MDM/DEP регистрация — оба ответа «No»', cmdmdmproc:'Процесс mdmclient — запускать сразу после перезагрузки', cmdmanaged:'Управляемые настройки — ещё один признак MDM', cmdsudocheck:'Пароль администратора — продавец должен его знать', cmdfirmware:'Firmware-пароль (только Intel) — должно быть «No»', cmdfans:'Обороты вентиляторов (rpm)', cmdstress:'Стресс CPU ~40 сек — вентиляторы раскрутятся, слушайте скрежет; остановится сам', progress:'{d} из {t} проверок выполнено', reset:'Сбросить прогресс', resetConfirm:'Сбросить весь прогресс?', close:'✕ Закрыть', test:'Тест',
   snPh:'Серийный номер ( → About This Mac)', coverage:'Проверить покрытие на apple.com', snEmpty:'Сначала введите серийный номер',
   wifiOn:'Сейчас: онлайн ✅ — откройте пару сайтов, проверьте стабильность', wifiOff:'Сейчас: офлайн ❌',
   pixelColors:['Белый','Чёрный','Красный','Зелёный','Синий','Серый (углы обзора)'], pixelHint:'{name} ({i}/{n}) — клик: следующий цвет, Esc: выход',
@@ -254,7 +258,7 @@ ru: {
  }
 },
 es: {
- sections: { exterior:'Aspecto exterior', serial:'Número de serie y especificaciones', diag:'Diagnóstico de Apple', ports:'Puertos y carga', screen:'Pantalla', media:'Multimedia', wifi:'Wi-Fi y Bluetooth', battery:'Batería', disk:'Almacenamiento', kb:'Teclado', security:'Seguridad y bloqueos ⚠️', passwords:'Contraseñas', trackpad:'Trackpad', fans:'Ventiladores', system:'Sistema' },
+ sections: { exterior:'Aspecto exterior', serial:'Número de serie y especificaciones', diag:'Diagnóstico de Apple', ports:'Puertos y carga', screen:'Pantalla', media:'Multimedia', wifi:'Wi-Fi y Bluetooth', battery:'Batería', disk:'Almacenamiento', kb:'Teclado', security:'MDM y bloqueos corporativos', handover:'Antes de pagar — desvinculación y entrega ⚠️', trackpad:'Trackpad', fans:'Ventiladores', system:'Sistema' },
  items: {
   screws:['Inspeccionar los tornillos','Cabezas rayadas significan que el portátil fue abierto'],
   flat:['Apoya plano sobre la mesa, sin tambalearse','Un chasis doblado sugiere una caída o una batería hinchada'],
@@ -306,7 +310,7 @@ es: {
   sleepwake:['Reposo/despertar funciona','Cierre la tapa, espere un minuto, ábrala — despertar instantáneo, sin pantalla negra ni reinicio. Defecto común tras daño por líquidos'],
  },
  ui: {
-  title:'🍎 Comprobación de MacBook usado', term:'⌨️ Pruebas en Terminal', termTitle:'Pruebas en Terminal (sin descargas)', termHint:'Abra Terminal (Cmd+Espacio → «Terminal») y pegue los comandos uno a uno. Los comandos con sudo piden la contraseña de administrador.', copy:'Copiar', copied:'✓ Copiado', pasteTitle:'Resultados de la autocomprobación', pasteHint:'Ejecute el primer comando de «⌨️ Pruebas en Terminal» en el Mac comprobado — el resultado se copia al portapapeles automáticamente. Péguelo aquí: los puntos se marcarán y los avisos y fallos se resaltarán.', apply:'Aplicar', applied:'{n} elementos actualizados', cmdfull:'Autocomprobación completa: imprime PASS/WARN/FAIL y copia el resultado — péguelo en el campo de arriba de la página', cmdmodel:'Modelo, chip, RAM y número de serie', cmdlock:'Activation Lock — debe ser «Disabled»', cmdbattery:'Batería: ciclos y capacidad (max/design ≥ 80%)', cmddisk:'Tamaño del disco y SMART — debe ser «Verified»', cmdmdm:'Inscripción MDM/DEP — ambas respuestas «No»', cmdmdmproc:'Proceso mdmclient — ejecutar justo tras reiniciar', cmdmanaged:'Preferencias administradas — otra señal de MDM', cmdsudocheck:'Contraseña de administrador — el vendedor debe conocerla', cmdfirmware:'Contraseña de firmware (solo Intel) — debe ser «No»', cmdfans:'Velocidad de los ventiladores (rpm)', cmdstress:'Estrés de CPU ~40 s — los ventiladores aceleran, escuche chirridos; se detiene solo', progress:'{d} de {t} comprobaciones hechas', reset:'Restablecer progreso', resetConfirm:'¿Restablecer todo el progreso?', close:'✕ Cerrar', test:'Probar',
+  title:'🍎 Comprobación de MacBook usado', term:'⌨️ Pruebas en Terminal', termTitle:'Pruebas en Terminal (sin descargas)', termHint:'Abra Terminal (Cmd+Espacio → «Terminal») y pegue los comandos uno a uno. Los comandos con sudo piden la contraseña de administrador.', copy:'Copiar', copied:'✓ Copiado', pasteTitle:'Resultados de la autocomprobación', pasteHint:'Ejecute el primer comando de «⌨️ Pruebas en Terminal» en el Mac comprobado — el resultado se copia al portapapeles automáticamente. Péguelo aquí: los puntos se marcarán y los avisos y fallos se resaltarán.', apply:'Aplicar', applied:'{n} elementos actualizados', crit:'crítico', cmdfull:'Autocomprobación completa: imprime PASS/WARN/FAIL y copia el resultado — péguelo en el campo de arriba de la página', cmdmodel:'Modelo, chip, RAM y número de serie', cmdlock:'Activation Lock — debe ser «Disabled»', cmdbattery:'Batería: ciclos y capacidad (max/design ≥ 80%)', cmddisk:'Tamaño del disco y SMART — debe ser «Verified»', cmdmdm:'Inscripción MDM/DEP — ambas respuestas «No»', cmdmdmproc:'Proceso mdmclient — ejecutar justo tras reiniciar', cmdmanaged:'Preferencias administradas — otra señal de MDM', cmdsudocheck:'Contraseña de administrador — el vendedor debe conocerla', cmdfirmware:'Contraseña de firmware (solo Intel) — debe ser «No»', cmdfans:'Velocidad de los ventiladores (rpm)', cmdstress:'Estrés de CPU ~40 s — los ventiladores aceleran, escuche chirridos; se detiene solo', progress:'{d} de {t} comprobaciones hechas', reset:'Restablecer progreso', resetConfirm:'¿Restablecer todo el progreso?', close:'✕ Cerrar', test:'Probar',
   snPh:'Número de serie ( → About This Mac)', coverage:'Comprobar cobertura en apple.com', snEmpty:'Introduzca primero un número de serie',
   wifiOn:'Ahora: en línea ✅ — abra varios sitios, compruebe la estabilidad', wifiOff:'Ahora: sin conexión ❌',
   pixelColors:['Blanco','Negro','Rojo','Verde','Azul','Gris (ángulos de visión)'], pixelHint:'{name} ({i}/{n}) — clic: siguiente color, Esc: salir',
@@ -319,7 +323,7 @@ es: {
  }
 },
 de: {
- sections: { exterior:'Äußerer Zustand', serial:'Seriennummer & Ausstattung', diag:'Apple-Diagnose', ports:'Anschlüsse & Laden', screen:'Bildschirm', media:'Multimedia', wifi:'WLAN & Bluetooth', battery:'Akku', disk:'Speicher', kb:'Tastatur', security:'Sicherheit & Sperren ⚠️', passwords:'Passwörter', trackpad:'Trackpad', fans:'Lüfter', system:'System' },
+ sections: { exterior:'Äußerer Zustand', serial:'Seriennummer & Ausstattung', diag:'Apple-Diagnose', ports:'Anschlüsse & Laden', screen:'Bildschirm', media:'Multimedia', wifi:'WLAN & Bluetooth', battery:'Akku', disk:'Speicher', kb:'Tastatur', security:'MDM & Firmensperren', handover:'Vor der Bezahlung — Abmeldung & Übergabe ⚠️', trackpad:'Trackpad', fans:'Lüfter', system:'System' },
  items: {
   screws:['Schrauben inspizieren','Zerkratzte Schraubenköpfe bedeuten, dass das Gerät geöffnet wurde'],
   flat:['Liegt flach auf dem Tisch, wackelt nicht','Ein verbogenes Gehäuse deutet auf einen Sturz oder einen aufgeblähten Akku hin'],
@@ -371,7 +375,7 @@ de: {
   sleepwake:['Ruhezustand/Aufwachen funktioniert','Deckel schließen, eine Minute warten, öffnen — sofortiges Aufwachen, kein schwarzer Bildschirm, kein Neustart. Häufiger Defekt nach Flüssigkeitsschaden'],
  },
  ui: {
-  title:'🍎 Gebrauchtes MacBook prüfen', term:'⌨️ Terminal-Checks', termTitle:'Terminal-Checks (ohne Downloads)', termHint:'Terminal öffnen (Cmd+Leertaste → „Terminal“) und die Befehle einzeln einfügen. Befehle mit sudo fragen nach dem Administrator-Passwort.', copy:'Kopieren', copied:'✓ Kopiert', pasteTitle:'Ergebnisse der Auto-Prüfung', pasteHint:'Führen Sie den ersten Befehl aus „⌨️ Terminal-Checks“ auf dem geprüften Mac aus — das Ergebnis wird automatisch in die Zwischenablage kopiert. Hier einfügen: Punkte werden abgehakt, Warnungen und Fehler hervorgehoben.', apply:'Anwenden', applied:'{n} Punkte aktualisiert', cmdfull:'Komplette Auto-Prüfung: gibt PASS/WARN/FAIL aus und kopiert das Ergebnis — oben auf der Seite einfügen', cmdmodel:'Modell, Chip, RAM und Seriennummer', cmdlock:'Activation Lock — erwartet: „Disabled“', cmdbattery:'Akku: Zyklen und Kapazität (max/design ≥ 80%)', cmddisk:'Festplattengröße und SMART — erwartet: „Verified“', cmdmdm:'MDM/DEP-Registrierung — beide Antworten „No“', cmdmdmproc:'mdmclient-Prozess — direkt nach einem Neustart ausführen', cmdmanaged:'Verwaltete Einstellungen — weiteres MDM-Anzeichen', cmdsudocheck:'Administrator-Passwort — der Verkäufer muss es kennen', cmdfirmware:'Firmware-Passwort (nur Intel) — erwartet: „No“', cmdfans:'Lüfterdrehzahl (rpm)', cmdstress:'CPU-Stress ~40 s — Lüfter drehen hoch, auf Schleifgeräusche hören; stoppt von selbst', progress:'{d} von {t} Prüfungen erledigt', reset:'Fortschritt zurücksetzen', resetConfirm:'Gesamten Fortschritt zurücksetzen?', close:'✕ Schließen', test:'Test',
+  title:'🍎 Gebrauchtes MacBook prüfen', term:'⌨️ Terminal-Checks', termTitle:'Terminal-Checks (ohne Downloads)', termHint:'Terminal öffnen (Cmd+Leertaste → „Terminal“) und die Befehle einzeln einfügen. Befehle mit sudo fragen nach dem Administrator-Passwort.', copy:'Kopieren', copied:'✓ Kopiert', pasteTitle:'Ergebnisse der Auto-Prüfung', pasteHint:'Führen Sie den ersten Befehl aus „⌨️ Terminal-Checks“ auf dem geprüften Mac aus — das Ergebnis wird automatisch in die Zwischenablage kopiert. Hier einfügen: Punkte werden abgehakt, Warnungen und Fehler hervorgehoben.', apply:'Anwenden', applied:'{n} Punkte aktualisiert', crit:'kritisch', cmdfull:'Komplette Auto-Prüfung: gibt PASS/WARN/FAIL aus und kopiert das Ergebnis — oben auf der Seite einfügen', cmdmodel:'Modell, Chip, RAM und Seriennummer', cmdlock:'Activation Lock — erwartet: „Disabled“', cmdbattery:'Akku: Zyklen und Kapazität (max/design ≥ 80%)', cmddisk:'Festplattengröße und SMART — erwartet: „Verified“', cmdmdm:'MDM/DEP-Registrierung — beide Antworten „No“', cmdmdmproc:'mdmclient-Prozess — direkt nach einem Neustart ausführen', cmdmanaged:'Verwaltete Einstellungen — weiteres MDM-Anzeichen', cmdsudocheck:'Administrator-Passwort — der Verkäufer muss es kennen', cmdfirmware:'Firmware-Passwort (nur Intel) — erwartet: „No“', cmdfans:'Lüfterdrehzahl (rpm)', cmdstress:'CPU-Stress ~40 s — Lüfter drehen hoch, auf Schleifgeräusche hören; stoppt von selbst', progress:'{d} von {t} Prüfungen erledigt', reset:'Fortschritt zurücksetzen', resetConfirm:'Gesamten Fortschritt zurücksetzen?', close:'✕ Schließen', test:'Test',
   snPh:'Seriennummer ( → About This Mac)', coverage:'Abdeckung auf apple.com prüfen', snEmpty:'Bitte zuerst eine Seriennummer eingeben',
   wifiOn:'Jetzt: online ✅ — einige Seiten öffnen, Stabilität prüfen', wifiOff:'Jetzt: offline ❌',
   pixelColors:['Weiß','Schwarz','Rot','Grün','Blau','Grau (Blickwinkel)'], pixelHint:'{name} ({i}/{n}) — Klick: nächste Farbe, Esc: beenden',
@@ -416,7 +420,7 @@ function render() {
     for (const it of secItems) {
       const [id, test] = Array.isArray(it) ? it : [it, null];
       const [label, hint] = items[id];
-      html += `<li data-id="${id}"><input type="checkbox"><label>${label}${badge(id)}` +
+      html += `<li data-id="${id}"${CRIT.has(id) ? ' class="crit"' : ''}><input type="checkbox"><label>${label}${CRIT.has(id) ? ` <span class="critchip">❗ ${ui.crit}</span>` : ''}${badge(id)}` +
         (hint ? `<span class="hint">${hint}</span>` : '') +
         (id === 'wifi' ? `<span class="hint" id="wifistatus"></span>` : '') +
         `</label>` +
